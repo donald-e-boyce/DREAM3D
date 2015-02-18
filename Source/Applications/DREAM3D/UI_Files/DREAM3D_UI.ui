@@ -137,8 +137,8 @@ color: white;
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>607</width>
-             <height>544</height>
+             <width>642</width>
+             <height>550</height>
             </rect>
            </property>
            <property name="sizePolicy">
@@ -222,7 +222,7 @@ border: 2px solid;
      <x>0</x>
      <y>0</y>
      <width>1060</width>
-     <height>22</height>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -239,6 +239,8 @@ border: 2px solid;
     <addaction name="actionExportPipeline"/>
     <addaction name="separator"/>
     <addaction name="menu_RecentFiles"/>
+    <addaction name="separator"/>
+    <addaction name="actionPreferences"/>
     <addaction name="separator"/>
     <addaction name="actionExit"/>
    </widget>
@@ -265,11 +267,11 @@ border: 2px solid;
     </property>
     <addaction name="actionShow_User_Manual"/>
     <addaction name="actionLicense_Information"/>
+    <addaction name="actionPlugin_Information"/>
     <addaction name="separator"/>
     <addaction name="actionCheck_For_Updates"/>
     <addaction name="separator"/>
     <addaction name="actionAbout_DREAM3D"/>
-    <addaction name="actionPlugin_Information"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuView"/>
@@ -472,13 +474,18 @@ border: 2px solid;
   </action>
   <action name="actionPlugin_Information">
    <property name="text">
-    <string>Plugin Information...</string>
+    <string>Show Plugin Information</string>
    </property>
    <property name="iconText">
     <string>Plugin Information</string>
    </property>
    <property name="toolTip">
     <string>Plugin Information</string>
+   </property>
+  </action>
+  <action name="actionPreferences">
+   <property name="text">
+    <string>Preferences</string>
    </property>
   </action>
  </widget>
