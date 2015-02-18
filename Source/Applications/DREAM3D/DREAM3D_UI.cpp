@@ -80,6 +80,7 @@
 
 #include "AboutDREAM3D.h"
 #include "AboutPlugins.h"
+#include "DREAM3DPreferences.h"
 
 // Initialize private static member variable
 QString DREAM3D_UI::m_OpenDialogLastDirectory = "";
@@ -1297,6 +1298,15 @@ void DREAM3D_UI::on_actionRemoveCurrentFilter_triggered()
 
 }
 #endif
+
+// -----------------------------------------------------------------------------
+//
+// -----------------------------------------------------------------------------
+void DREAM3D_UI::on_actionPreferences_triggered()
+{
+	DREAM3DPreferences prefDialog;
+	prefDialog.exec();
+}
 
 // -----------------------------------------------------------------------------
 //

@@ -122,6 +122,7 @@ class DREAM3D_UI : public QMainWindow, private Ui::DREAM3D_UI
     // File Menu
     void on_actionImportPipeline_triggered();
     void on_actionExportPipeline_triggered();
+	void on_actionPreferences_triggered();
     void on_actionExit_triggered();
 
     //Pipeline Menu
