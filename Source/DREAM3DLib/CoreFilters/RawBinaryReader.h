@@ -64,10 +64,22 @@ class DREAM3DLib_EXPORT RawBinaryReader : public AbstractFilter
     DREAM3D_TYPE_MACRO_SUPER(RawBinaryReader, AbstractFilter)
 
     virtual ~RawBinaryReader();
-    DREAM3D_FILTER_PARAMETER(QString, DataContainerName)
-    Q_PROPERTY(QString DataContainerName READ getDataContainerName WRITE setDataContainerName)
+    DREAM3D_FILTER_PARAMETER(QString, NewDataContainerName)
+    Q_PROPERTY(QString NewDataContainerName READ getNewDataContainerName WRITE setNewDataContainerName)
+    DREAM3D_FILTER_PARAMETER(QString, ExistingDataContainerName)
+    Q_PROPERTY(QString ExistingDataContainerName READ getExistingDataContainerName WRITE setExistingDataContainerName)
+
     DREAM3D_FILTER_PARAMETER(QString, CellAttributeMatrixName)
     Q_PROPERTY(QString CellAttributeMatrixName READ getCellAttributeMatrixName WRITE setCellAttributeMatrixName)
+
+    DREAM3D_FILTER_PARAMETER(QString, CellFeatureAttributeMatrixName)
+    Q_PROPERTY(QString CellFeatureAttributeMatrixName READ getCellFeatureAttributeMatrixName WRITE setCellFeatureAttributeMatrixName)
+
+    DREAM3D_FILTER_PARAMETER(QString, CellEnsembleAttributeMatrixName)
+    Q_PROPERTY(QString CellEnsembleAttributeMatrixName READ getCellEnsembleAttributeMatrixName WRITE setCellEnsembleAttributeMatrixName)
+
+    DREAM3D_FILTER_PARAMETER(DataArrayPath, AttributeMatrixPath)
+    Q_PROPERTY(DataArrayPath AttributeMatrixPath READ getAttributeMatrixPath WRITE setAttributeMatrixPath)
 
     typedef struct { int x; int y; int z; } Dimensions_t;
 
@@ -78,11 +90,11 @@ class DREAM3DLib_EXPORT RawBinaryReader : public AbstractFilter
     DREAM3D_FILTER_PARAMETER(int, Endian)
     Q_PROPERTY(int Endian READ getEndian WRITE setEndian)
 
-    DREAM3D_FILTER_PARAMETER(int, Dimensionality)
-    Q_PROPERTY(int Dimensionality READ getDimensionality WRITE setDimensionality)
-
     DREAM3D_FILTER_PARAMETER(int, NumberOfComponents)
     Q_PROPERTY(int NumberOfComponents READ getNumberOfComponents WRITE setNumberOfComponents)
+
+    DREAM3D_FILTER_PARAMETER(int, AttributeMatrixType)
+    Q_PROPERTY(int AttributeMatrixType READ getAttributeMatrixType WRITE setAttributeMatrixType)
 
     DREAM3D_FILTER_PARAMETER(IntVec3_t, Dimensions)
     Q_PROPERTY(IntVec3_t Dimensions READ getDimensions WRITE setDimensions)
@@ -93,8 +105,11 @@ class DREAM3DLib_EXPORT RawBinaryReader : public AbstractFilter
     DREAM3D_FILTER_PARAMETER(FloatVec3_t, Resolution)
     Q_PROPERTY(FloatVec3_t Resolution READ getResolution WRITE setResolution)
 
-    DREAM3D_FILTER_PARAMETER(bool, OverRideOriginResolution)
-    Q_PROPERTY(bool OverRideOriginResolution READ getOverRideOriginResolution WRITE setOverRideOriginResolution)
+    DREAM3D_FILTER_PARAMETER(int, NumFeatures)
+    Q_PROPERTY(int NumFeatures READ getNumFeatures WRITE setNumFeatures)
+
+    DREAM3D_FILTER_PARAMETER(int, NumPhases)
+    Q_PROPERTY(int NumPhases READ getNumPhases WRITE setNumPhases)
 
     DREAM3D_FILTER_PARAMETER(int, SkipHeaderBytes)
     Q_PROPERTY(int SkipHeaderBytes READ getSkipHeaderBytes WRITE setSkipHeaderBytes)
@@ -108,6 +123,9 @@ class DREAM3DLib_EXPORT RawBinaryReader : public AbstractFilter
 
     DREAM3D_FILTER_PARAMETER(bool, AddToExistingAttributeMatrix)
     Q_PROPERTY(bool AddToExistingAttributeMatrix READ getAddToExistingAttributeMatrix WRITE setAddToExistingAttributeMatrix)
+
+    DREAM3D_FILTER_PARAMETER(bool, AddToExistingDataContainer)
+    Q_PROPERTY(bool AddToExistingDataContainer READ getAddToExistingDataContainer WRITE setAddToExistingDataContainer)
 
 
     /**

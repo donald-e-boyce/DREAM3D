@@ -170,16 +170,22 @@ int readBinaryFile(typename DataArray<T>::Pointer p, const QString& filename, in
 // -----------------------------------------------------------------------------
 RawBinaryReader::RawBinaryReader() :
   AbstractFilter(),
-  m_DataContainerName(DREAM3D::Defaults::DataContainerName),
+  m_NewDataContainerName(DREAM3D::Defaults::DataContainerName),
+  m_ExistingDataContainerName(DREAM3D::Defaults::DataContainerName),
+  m_AttributeMatrixPath(DREAM3D::Defaults::DataContainerName, DREAM3D::Defaults::CellAttributeMatrixName, ""),
   m_CellAttributeMatrixName(DREAM3D::Defaults::CellAttributeMatrixName),
+  m_CellFeatureAttributeMatrixName(DREAM3D::Defaults::CellFeatureAttributeMatrixName),
+  m_CellEnsembleAttributeMatrixName(DREAM3D::Defaults::CellEnsembleAttributeMatrixName),
   m_ScalarType(0),
   m_Endian(0),
-  m_Dimensionality(0),
   m_NumberOfComponents(0),
-  m_OverRideOriginResolution(true),
+  m_NumFeatures(0),
+  m_NumPhases(0),
+  m_AttributeMatrixType(0),
   m_SkipHeaderBytes(0),
   m_OutputArrayName(""),
   m_InputFile(""),
+  m_AddToExistingDataContainer(false),
   m_AddToExistingAttributeMatrix(false)
 {
   m_Dimensions.x = 0;
@@ -211,6 +217,8 @@ void RawBinaryReader::setupFilterParameters()
   FilterParameterVector parameters;
   /* Place all your option initialization code here */
 
+  //information about binary file
+  parameters.push_back(FilterParameter::New("File Information", "", FilterParameterWidgetType::SeparatorWidget, "", false));
   parameters.push_back(FileSystemFilterParameter::New("Input File", "InputFile", FilterParameterWidgetType::InputFileWidget, getInputFile(), false, "", "*.raw *.bin"));
   {
     ChoiceFilterParameter::Pointer parameter = ChoiceFilterParameter::New();
@@ -231,7 +239,6 @@ void RawBinaryReader::setupFilterParameters()
     parameter->setChoices(choices);
     parameters.push_back(parameter);
   }
-  parameters.push_back(FilterParameter::New("Dimensionality", "Dimensionality", FilterParameterWidgetType::IntWidget, getDimensionality(), false));
   parameters.push_back(FilterParameter::New("Number Of Components", "NumberOfComponents", FilterParameterWidgetType::IntWidget, getNumberOfComponents(), false));
   {
     ChoiceFilterParameter::Pointer parameter = ChoiceFilterParameter::New();
@@ -244,16 +251,71 @@ void RawBinaryReader::setupFilterParameters()
     parameter->setChoices(choices);
     parameters.push_back(parameter);
   }
-  parameters.push_back(FilterParameter::New("Dimensions", "Dimensions", FilterParameterWidgetType::IntVec3Widget, getDimensions(), false, "XYZ"));
+  parameters.push_back(FilterParameter::New("Skip Header Bytes", "SkipHeaderBytes", FilterParameterWidgetType::IntWidget, getSkipHeaderBytes(), false));
+
+  
+
+  //existing or new datacontainer
+  parameters.push_back(FilterParameter::New("Data Container Information", "", FilterParameterWidgetType::SeparatorWidget, "", false));
+  {
+    QStringList linkedProps;
+    linkedProps << "ExistingDataContainerName" << "AddToExistingAttributeMatrix";
+    parameters.push_back(LinkedBooleanFilterParameter::New("Add to Existing DataContainer", "AddToExistingDataContainer", getAddToExistingDataContainer(), linkedProps, false));
+  }
+  //to be least confusing this should appear only when AddToExistingDataContainer && !AddToExistingAttributeMatrix
+  parameters.push_back(FilterParameter::New("Data Container", "ExistingDataContainerName", FilterParameterWidgetType::DataContainerSelectionWidget, getExistingDataContainerName(), false, ""));  
+
+  //to be least confusing these should appear only when !AddToExistingDataContainer
+  parameters.push_back(FilterParameter::New("Dimensions", "Dimensions", FilterParameterWidgetType::IntVec3Widget, getDimensions(), false, "XYZ", 0));
   parameters.push_back(FilterParameter::New("Origin", "Origin", FilterParameterWidgetType::FloatVec3Widget, getOrigin(), false, "XYZ"));
   parameters.push_back(FilterParameter::New("Resolution", "Resolution", FilterParameterWidgetType::FloatVec3Widget, getResolution(), false, "XYZ"));
-  parameters.push_back(FilterParameter::New("Over Ride Origin & Resolution", "OverRideOriginResolution", FilterParameterWidgetType::BooleanWidget, getOverRideOriginResolution(), false));
-  parameters.push_back(FilterParameter::New("Skip Header Bytes", "SkipHeaderBytes", FilterParameterWidgetType::IntWidget, getSkipHeaderBytes(), false));
+
+
+
+  //exiting or new attribute matrix
+  {
+    QStringList linkedProps;
+    linkedProps << "AttributeMatrixPath";
+    parameters.push_back(LinkedBooleanFilterParameter::New("Add to Existing AttributeMatrix", "AddToExistingAttributeMatrix", getAddToExistingAttributeMatrix(), linkedProps, false));
+  }
+  parameters.push_back(FilterParameter::New("Attribute Matrix", "AttributeMatrixPath", FilterParameterWidgetType::AttributeMatrixSelectionWidget, getAttributeMatrixPath(), false, ""));
+  
+  //to be least confusing this comobobox (and all linked parameters) should only appear if !AddToExistingAttributeMatrix
+  {
+    LinkedChoicesFilterParameter::Pointer parameter = LinkedChoicesFilterParameter::New();
+    parameter->setHumanLabel("Attribute Matrix Type");
+    parameter->setPropertyName("AttributeMatrixType");
+    parameter->setWidgetType(FilterParameterWidgetType::ChoiceWidget);
+    parameter->setDefaultValue(getAttributeMatrixType()); // Just set the first index
+
+    QVector<QString> choices;
+    choices.push_back("Cell");
+    choices.push_back("Cell Feature");
+    choices.push_back("Cell Ensemble");
+    parameter->setChoices(choices);
+    QStringList linkedProps;
+    linkedProps << "NumFeatures" << "NumPhases" << "CellAttributeMatrixName" << "CellFeatureAttributeMatrixName" << "CellEnsembleAttributeMatrixName";
+    parameter->setLinkedProperties(linkedProps);
+    parameter->setEditable(false);
+    parameters.push_back(parameter);
+
+  }
+  //atribute matrix dimensions (type specific)
+  parameters.push_back(FilterParameter::New("Number of Features", "NumFeatures", FilterParameterWidgetType::IntWidget, getNumFeatures(), false, "", 1));
+  parameters.push_back(FilterParameter::New("Number of Phases", "NumPhases", FilterParameterWidgetType::IntWidget, getNumPhases(), false, "", 2));
+
+
+  //names for created information
+  parameters.push_back(FilterParameter::New("Created Information", "", FilterParameterWidgetType::SeparatorWidget, "", false));
   parameters.push_back(FilterParameter::New("Output Array Name", "OutputArrayName", FilterParameterWidgetType::StringWidget, getOutputArrayName(), false));
-  parameters.push_back(FilterParameter::New("Created Information", "", FilterParameterWidgetType::SeparatorWidget, "", true));
-  parameters.push_back(FilterParameter::New("Add to Existing DataContainer & AttributeMatrix", "AddToExistingAttributeMatrix", FilterParameterWidgetType::BooleanWidget, getDataContainerName(), true));
-  parameters.push_back(FilterParameter::New("Data Container Name", "DataContainerName", FilterParameterWidgetType::StringWidget, getDataContainerName(), true));
-  parameters.push_back(FilterParameter::New("Cell Attribute Matrix Name", "CellAttributeMatrixName", FilterParameterWidgetType::StringWidget, getCellAttributeMatrixName(), true));
+
+  //to be least confusing this should only appear when !AddToExistingDataContainer
+  parameters.push_back(FilterParameter::New("New Data Container Name", "NewDataContainerName", FilterParameterWidgetType::StringWidget, getNewDataContainerName(), true));
+
+  //different default names for different attribute matrix types (to be least confusing these should only appear when !AddToExistingAttributeMatrix (in addition to appropriate combobox selection))
+  parameters.push_back(FilterParameter::New("Cell Attribute Matrix Name", "CellAttributeMatrixName", FilterParameterWidgetType::StringWidget, getCellAttributeMatrixName(), true, "", 0));
+  parameters.push_back(FilterParameter::New("Cell Feature Attribute Matrix Name", "CellFeatureAttributeMatrixName", FilterParameterWidgetType::StringWidget, getCellFeatureAttributeMatrixName(), true, "", 1));
+  parameters.push_back(FilterParameter::New("Cell Ensemble Attribute Matrix Name", "CellEnsembleAttributeMatrixName", FilterParameterWidgetType::StringWidget, getCellEnsembleAttributeMatrixName(), true, "", 2));
   setFilterParameters(parameters);
 }
 
@@ -263,20 +325,29 @@ void RawBinaryReader::setupFilterParameters()
 void RawBinaryReader::readFilterParameters(AbstractFilterParametersReader* reader, int index)
 {
   reader->openFilterGroup(this, index);
-  setDataContainerName(reader->readString("DataContainerName", getDataContainerName() ) );
-  setCellAttributeMatrixName(reader->readString("CellAttributeMatrixName", getCellAttributeMatrixName() ) );
   setInputFile( reader->readString( "InputFile", getInputFile() ) );
   setScalarType( reader->readValue("ScalarType", getScalarType()) );
-  setDimensionality( reader->readValue("Dimensionality", getDimensionality()) );
   setNumberOfComponents( reader->readValue("NumberOfComponents", getNumberOfComponents()) );
   setEndian( reader->readValue("Endian", getEndian()) );
-  setDimensions( reader->readIntVec3("Dimensions", getDimensions() ) );
+  setSkipHeaderBytes( reader->readValue("SkipHeaderBytes", getSkipHeaderBytes()) );
+
+  setAddToExistingDataContainer(reader->readValue("AddToExistingDataContainer", getAddToExistingDataContainer() ) );
+  setExistingDataContainerName(reader->readString("ExistingDataContainerName", getExistingDataContainerName() ) );
   setOrigin( reader->readFloatVec3("Origin", getOrigin() ) );
   setResolution( reader->readFloatVec3("Resolution", getResolution() ) );
-  setOverRideOriginResolution( reader->readValue("OverRideOriginResolution", getOverRideOriginResolution()) );
-  setSkipHeaderBytes( reader->readValue("SkipHeaderBytes", getSkipHeaderBytes()) );
-  setOutputArrayName( reader->readString( "OutputArrayName", getOutputArrayName() ) );
+
   setAddToExistingAttributeMatrix(reader->readValue("AddToExistingAttributeMatrix", getAddToExistingAttributeMatrix() ) );
+  setAttributeMatrixPath(reader->readDataArrayPath("AttributeMatrixPath", getAttributeMatrixPath() ) );
+  setAttributeMatrixType(reader->readValue("AttributeMatrixType", getAttributeMatrixType() ) );
+  setDimensions( reader->readIntVec3("Dimensions", getDimensions() ) );
+  setNumFeatures(reader->readValue("NumFeatures", getNumFeatures() ) );
+  setNumPhases(reader->readValue("NumPhases", getNumPhases() ) );
+
+  setOutputArrayName( reader->readString( "OutputArrayName", getOutputArrayName() ) );
+  setNewDataContainerName(reader->readString("NewDataContainerName", getNewDataContainerName() ) );
+  setCellAttributeMatrixName(reader->readString("CellAttributeMatrixName", getCellAttributeMatrixName() ) );
+  setCellFeatureAttributeMatrixName(reader->readString("CellFeatureAttributeMatrixName", getCellFeatureAttributeMatrixName() ) );
+  setCellEnsembleAttributeMatrixName(reader->readString("CellEnsembleAttributeMatrixName", getCellEnsembleAttributeMatrixName() ) );
   reader->closeFilterGroup();
 }
 
@@ -286,20 +357,29 @@ void RawBinaryReader::readFilterParameters(AbstractFilterParametersReader* reade
 int RawBinaryReader::writeFilterParameters(AbstractFilterParametersWriter* writer, int index)
 {
   writer->openFilterGroup(this, index);
-  DREAM3D_FILTER_WRITE_PARAMETER(DataContainerName)
-  DREAM3D_FILTER_WRITE_PARAMETER(CellAttributeMatrixName)
+  DREAM3D_FILTER_WRITE_PARAMETER(InputFile)
   DREAM3D_FILTER_WRITE_PARAMETER(ScalarType)
-  DREAM3D_FILTER_WRITE_PARAMETER(Dimensionality)
   DREAM3D_FILTER_WRITE_PARAMETER(NumberOfComponents)
   DREAM3D_FILTER_WRITE_PARAMETER(Endian)
-  DREAM3D_FILTER_WRITE_PARAMETER(Dimensions)
+  DREAM3D_FILTER_WRITE_PARAMETER(SkipHeaderBytes)
+
+  DREAM3D_FILTER_WRITE_PARAMETER(AddToExistingDataContainer)
+  DREAM3D_FILTER_WRITE_PARAMETER(ExistingDataContainerName)
   DREAM3D_FILTER_WRITE_PARAMETER(Origin)
   DREAM3D_FILTER_WRITE_PARAMETER(Resolution)
-  DREAM3D_FILTER_WRITE_PARAMETER(InputFile)
-  DREAM3D_FILTER_WRITE_PARAMETER(OverRideOriginResolution)
-  DREAM3D_FILTER_WRITE_PARAMETER(SkipHeaderBytes)
-  DREAM3D_FILTER_WRITE_PARAMETER(OutputArrayName)
+
   DREAM3D_FILTER_WRITE_PARAMETER(AddToExistingAttributeMatrix)
+  DREAM3D_FILTER_WRITE_PARAMETER(AttributeMatrixPath)
+  DREAM3D_FILTER_WRITE_PARAMETER(AttributeMatrixType)
+  DREAM3D_FILTER_WRITE_PARAMETER(Dimensions)
+  DREAM3D_FILTER_WRITE_PARAMETER(NumFeatures)
+  DREAM3D_FILTER_WRITE_PARAMETER(NumPhases)
+  
+  DREAM3D_FILTER_WRITE_PARAMETER(OutputArrayName)
+  DREAM3D_FILTER_WRITE_PARAMETER(NewDataContainerName)
+  DREAM3D_FILTER_WRITE_PARAMETER(CellAttributeMatrixName)
+  DREAM3D_FILTER_WRITE_PARAMETER(CellFeatureAttributeMatrixName)
+  DREAM3D_FILTER_WRITE_PARAMETER(CellEnsembleAttributeMatrixName)
   writer->closeFilterGroup();
   return ++index; // we want to return the next index that was just written to
 }
@@ -311,6 +391,7 @@ void RawBinaryReader::dataCheck(bool preflight)
 {
   setErrorCondition(0);
 
+  //get file name and make sure it exists
   QFileInfo fi(getInputFile());
   if (getInputFile().isEmpty() == true)
   {
@@ -325,6 +406,7 @@ void RawBinaryReader::dataCheck(bool preflight)
     notifyErrorMessage(getHumanLabel(), ss, getErrorCondition());
   }
 
+  //make sure a name has been selected for the created data
   if(m_OutputArrayName.isEmpty() == true)
   {
     QString ss = QObject::tr("The Output Array Name is blank (empty) and a value must be filled in for the pipeline to complete.");
@@ -332,6 +414,7 @@ void RawBinaryReader::dataCheck(bool preflight)
     notifyErrorMessage(getHumanLabel(), ss, getErrorCondition());
   }
 
+  //make sure there is at least 1 component in 1 dimension
   if (m_NumberOfComponents < 1)
   {
     QString ss = QObject::tr("The number of components must be larger than Zero");
@@ -339,32 +422,34 @@ void RawBinaryReader::dataCheck(bool preflight)
     notifyErrorMessage(getHumanLabel(), ss, getErrorCondition());
   }
 
-  if (m_Dimensionality < 1)
+  //check dimensions if needed (new data contianer)
+  if( !getAddToExistingDataContainer() ) 
   {
-    QString ss = QObject::tr("The dimensionality must be larger than Zero");
-    setErrorCondition(-389);
-    notifyErrorMessage(getHumanLabel(), ss, getErrorCondition());
-  }
-
-  if (  m_Dimensions.x == 0 || m_Dimensions.y == 0 || m_Dimensions.z == 0)
-  {
-    QString ss = QObject::tr("One of the dimensions has a size less than or Equal to Zero (0). The minimum size must be greater than One (1).");
-    setErrorCondition(-390);
-    notifyErrorMessage(getHumanLabel(), ss, getErrorCondition());
+    if (  m_Dimensions.x == 0 || m_Dimensions.y == 0 || m_Dimensions.z == 0)
+    {
+      QString ss = QObject::tr("One of the dimensions has a size less than or Equal to Zero (0). The minimum size must be greater than One (1).");
+      setErrorCondition(-390);
+      notifyErrorMessage(getHumanLabel(), ss, getErrorCondition());
+    }
   }
 
   DataContainer::Pointer m = DataContainer::NullPointer();
   AttributeMatrix::Pointer attrMat;
 
-  if (getAddToExistingAttributeMatrix() )
+  //get or create data container
+  if(getAddToExistingDataContainer())
   {
-    m = getDataContainerArray()->getPrereqDataContainer<AbstractFilter>(this, getDataContainerName());
-    if(getErrorCondition() < 0)
+    //existing data container, get name from correct place (depends on if we will also use existing attribute matrix)
+    if(getAddToExistingAttributeMatrix())
     {
-      return;
+      //existing data continaer and attirbute matrix
+      m = getDataContainerArray()->getPrereqDataContainer<AbstractFilter>(this, getAttributeMatrixPath().getDataContainerName());
     }
-
-    attrMat = m->getPrereqAttributeMatrix<AbstractFilter>(this, getCellAttributeMatrixName(), -10000);
+    else
+    {
+      //existing data continaer but new attirbute matrix
+      m = getDataContainerArray()->getPrereqDataContainer<AbstractFilter>(this, getExistingDataContainerName());
+    }
     if(getErrorCondition() < 0)
     {
       return;
@@ -372,77 +457,216 @@ void RawBinaryReader::dataCheck(bool preflight)
   }
   else
   {
-    m = getDataContainerArray()->createNonPrereqDataContainer<AbstractFilter>(this, getDataContainerName());
+    //new data container
+    m = getDataContainerArray()->createNonPrereqDataContainer<AbstractFilter>(this, getNewDataContainerName());
     if(getErrorCondition() < 0)
     {
       return;
     }
 
-    QVector<size_t> tDims(3, 0);
-    tDims[0] = m_Dimensions.x;
-    tDims[1] = m_Dimensions.y;
-    tDims[2] =  m_Dimensions.z;
-    attrMat = m->createNonPrereqAttributeMatrix<AbstractFilter>(this, getCellAttributeMatrixName(), tDims, DREAM3D::AttributeMatrixType::Cell);
+    //if creating new data container, set geometry
+    if(!getAddToExistingDataContainer())
+    {
+      ImageGeom::Pointer image = ImageGeom::CreateGeometry("BinaryImage");
+      image->setDimensions(m_Dimensions.x, m_Dimensions.y, m_Dimensions.z);
+      image->setResolution(m_Resolution.x, m_Resolution.y, m_Resolution.z);
+      image->setOrigin(m_Origin.x, m_Origin.y, m_Origin.z);
+      m->setGeometry(image);
+    }
+    //otherwise make sure it is the correct type
+    else if(DREAM3D::GeometryType::ImageGeometry != m->getGeometry()->getGeometryType())
+    {
+      QString ss = QObject::tr("Rectilinear grid geometry required.");
+      setErrorCondition(-390);
+      notifyErrorMessage(getHumanLabel(), ss, getErrorCondition());
+      return;
+    }
+
+  }
+
+  //get or create attribute matrix
+  if(getAddToExistingDataContainer() && getAddToExistingAttributeMatrix())
+  {
+    //existing attribute matrix
+    attrMat = m->getPrereqAttributeMatrix<AbstractFilter>(this, getAttributeMatrixPath().getAttributeMatrixName(), -10000);
+    if(getErrorCondition() < 0)
+    {
+      return;
+    }
+
+    //set attribute matrix type
+    switch(attrMat->getType())
+    {
+      case DREAM3D::AttributeMatrixType::Cell:
+      {
+        setAttributeMatrixType(0);
+      }
+      break;
+
+      case DREAM3D::AttributeMatrixType::CellFeature:
+      {
+        setAttributeMatrixType(1);
+      }
+      break;
+
+      case DREAM3D::AttributeMatrixType::CellEnsemble:
+      {
+        setAttributeMatrixType(2);
+      }
+      break;
+
+      default:
+      {
+      QString ss = QObject::tr("Selected AttributeMatrix has unsupported type.");
+      setErrorCondition(-391);
+      notifyErrorMessage(getHumanLabel(), ss, getErrorCondition());
+      return;
+      }
+    }
+  }
+  else
+  {
+    //new attribute matrix (may be new data container + attribute matrix or just new data container, may not)
+    switch(getAttributeMatrixType())
+    {
+      //cell
+      case 0:
+        {
+          //use dimensions of created or existing data container
+          QVector<size_t> tDims(3, 0);
+          ImageGeom::Pointer igeom = m->getGeometryAs<ImageGeom>();
+          tDims[0] = igeom->getXPoints();
+          tDims[1] = igeom->getYPoints();
+          tDims[2] = igeom->getZPoints();          
+          attrMat = m->createNonPrereqAttributeMatrix<AbstractFilter>(this, getCellAttributeMatrixName(), tDims, DREAM3D::AttributeMatrixType::Cell);
+        }
+        break;
+
+      //cell feature
+      case 1:
+        {
+          QVector<size_t> tDims(1, getNumFeatures() + 1);//1 spot for each feature + feature 0
+          attrMat = m->createNonPrereqAttributeMatrix<AbstractFilter>(this, getCellFeatureAttributeMatrixName(), tDims, DREAM3D::AttributeMatrixType::CellFeature);
+        }
+        break;
+
+
+      //cell ensemble
+      case 2:
+        {
+          QVector<size_t> tDims(1, getNumPhases() + 1);//1 spot for each phase + bad phase
+          attrMat = m->createNonPrereqAttributeMatrix<AbstractFilter>(this, getCellEnsembleAttributeMatrixName(), tDims, DREAM3D::AttributeMatrixType::CellEnsemble);
+        }
+        break;
+
+      default:
+        //future location for other types
+        QString ss = QObject::tr("Unsupported AttributeMatrix type selected.");
+        setErrorCondition(-1);
+        notifyErrorMessage(getHumanLabel(), ss, getErrorCondition());
+    }
     if(getErrorCondition() < 0)
     {
       return;
     }
   }
 
+  //create array for preflight
   if (true == preflight)
   {
-    size_t allocatedBytes = 0;
     IDataArray::Pointer p = IDataArray::NullPointer();
     QVector<size_t> dims(1, m_NumberOfComponents);
+
+    //determine number of elements
+    QVector<size_t> matDims = attrMat->getTupleDimensions();
+    size_t allocatedBytes = m_NumberOfComponents;
+    for(size_t i = 0; i < matDims.size(); i++)
+    {
+      allocatedBytes *= matDims[i];
+    }
+
+    // switch(getAttributeMatrixType())
+    // {
+    //   //cell
+    //   case 0:
+    //     {
+    //       allocatedBytes = m_NumberOfComponents * m_Dimensions.x * m_Dimensions.y * m_Dimensions.z;
+    //     }
+    //     break;
+
+    //   //cell feature
+    //   case 1:
+    //     {
+    //       allocatedBytes = m_NumberOfComponents * getNumFeatures();
+    //     }
+    //     break;
+
+
+    //   //cell ensemble
+    //   case 2:
+    //     {
+    //       allocatedBytes = m_NumberOfComponents * getNumPhases();
+    //     }
+    //     break;
+
+    //   default:
+    //     //future location for other types
+    //     QString ss = QObject::tr("Unsupported AttributeMatrix type selected.");
+    //     setErrorCondition(-1);
+    //     notifyErrorMessage(getHumanLabel(), ss, getErrorCondition());
+    //     return;
+    // }
+
+    //create correctly typed array + scale number of bytes with type
     if (m_ScalarType == Detail::Int8)
     {
       attrMat->createAndAddAttributeArray<DataArray<int8_t>, AbstractFilter, int8_t>(this, m_OutputArrayName, 0, dims);
-      allocatedBytes = sizeof(int8_t) * m_NumberOfComponents * m_Dimensions.x * m_Dimensions.y * m_Dimensions.z;
+      allocatedBytes *= sizeof(int8_t);
     }
     else if (m_ScalarType == Detail::UInt8)
     {
       attrMat->createAndAddAttributeArray<DataArray<uint8_t>, AbstractFilter, uint8_t>(this, m_OutputArrayName, 0, dims);
-      allocatedBytes = sizeof(uint8_t) * m_NumberOfComponents * m_Dimensions.x * m_Dimensions.y * m_Dimensions.z;
+      allocatedBytes *= sizeof(uint8_t);
     }
     else if (m_ScalarType == Detail::Int16)
     {
       attrMat->createAndAddAttributeArray<DataArray<int16_t>, AbstractFilter, int16_t>(this, m_OutputArrayName, 0, dims);
-      allocatedBytes = sizeof(int16_t) * m_NumberOfComponents * m_Dimensions.x * m_Dimensions.y * m_Dimensions.z;
+      allocatedBytes *= sizeof(int16_t);
     }
     else if (m_ScalarType == Detail::UInt16)
     {
       attrMat->createAndAddAttributeArray<DataArray<uint16_t>, AbstractFilter, uint16_t>(this, m_OutputArrayName, 0, dims);
-      allocatedBytes = sizeof(uint16_t) * m_NumberOfComponents * m_Dimensions.x * m_Dimensions.y * m_Dimensions.z;
+      allocatedBytes *= sizeof(uint16_t);
     }
     else if (m_ScalarType == Detail::Int32)
     {
       attrMat->createAndAddAttributeArray<DataArray<int32_t>, AbstractFilter, int32_t>(this, m_OutputArrayName, 0, dims);
-      allocatedBytes = sizeof(int32_t) * m_NumberOfComponents * m_Dimensions.x * m_Dimensions.y * m_Dimensions.z;
+      allocatedBytes *= sizeof(int32_t);
     }
     else if (m_ScalarType == Detail::UInt32)
     {
       attrMat->createAndAddAttributeArray<DataArray<uint32_t>, AbstractFilter, uint32_t>(this, m_OutputArrayName, 0, dims);
-      allocatedBytes = sizeof(uint32_t) * m_NumberOfComponents * m_Dimensions.x * m_Dimensions.y * m_Dimensions.z;
+      allocatedBytes *= sizeof(uint32_t);
     }
     else if (m_ScalarType == Detail::Int64)
     {
       attrMat->createAndAddAttributeArray<DataArray<int64_t>, AbstractFilter, int64_t>(this, m_OutputArrayName, 0, dims);
-      allocatedBytes = sizeof(int64_t) * m_NumberOfComponents * m_Dimensions.x * m_Dimensions.y * m_Dimensions.z;
+      allocatedBytes *= sizeof(int64_t);
     }
     else if (m_ScalarType == Detail::UInt64)
     {
       attrMat->createAndAddAttributeArray<DataArray<uint64_t>, AbstractFilter, uint64_t>(this, m_OutputArrayName, 0, dims);
-      allocatedBytes = sizeof(uint64_t) * m_NumberOfComponents * m_Dimensions.x * m_Dimensions.y * m_Dimensions.z;
+      allocatedBytes *= sizeof(uint64_t);
     }
     else if (m_ScalarType == Detail::Float)
     {
       attrMat->createAndAddAttributeArray<DataArray<float>, AbstractFilter, float>(this, m_OutputArrayName, 0, dims);
-      allocatedBytes = sizeof(float) * m_NumberOfComponents * m_Dimensions.x * m_Dimensions.y * m_Dimensions.z;
+      allocatedBytes *= sizeof(float);
     }
     else if (m_ScalarType == Detail::Double)
     {
       attrMat->createAndAddAttributeArray<DataArray<double>, AbstractFilter, double>(this, m_OutputArrayName, 0, dims);
-      allocatedBytes = sizeof(double) * m_NumberOfComponents * m_Dimensions.x * m_Dimensions.y * m_Dimensions.z;
+      allocatedBytes *= sizeof(double);
     }
 
     // Sanity Check Allocated Bytes versus size of file
@@ -463,12 +687,6 @@ void RawBinaryReader::dataCheck(bool preflight)
                                " DREAM3D will read only the first part of the file into the array.").arg(fileSize).arg(allocatedBytes);
       notifyWarningMessage(getHumanLabel(), ss, RBR_FILE_TOO_BIG);
     }
-
-    ImageGeom::Pointer image = ImageGeom::CreateGeometry("BinaryImage");
-    image->setDimensions(m_Dimensions.x, m_Dimensions.y, m_Dimensions.z);
-    image->setResolution(m_Resolution.x, m_Resolution.y, m_Resolution.z);
-    image->setOrigin(m_Origin.x, m_Origin.y, m_Origin.z);
-    m->setGeometry(image);
   }
 }
 
@@ -500,28 +718,99 @@ void RawBinaryReader::execute()
   {
     return;
   }
-  DataContainer::Pointer m = getDataContainerArray()->getDataContainer(getDataContainerName());
-  ImageGeom::Pointer image = ImageGeom::CreateGeometry("BinaryImage");
-  m->setGeometry(image);
+
+
+  DataContainer::Pointer m;
+  if(getAddToExistingDataContainer())
+  {
+    //existing data container, get name from correct place (depends on if we will also use existing attribute matrix)
+    if(getAddToExistingAttributeMatrix())
+    {
+      //existing data continaer and attirbute matrix
+      m = getDataContainerArray()->getDataContainer(getAttributeMatrixPath().getDataContainerName());
+    }
+    else
+    {
+      //existing data continaer but new attirbute matrix
+      m = getDataContainerArray()->getDataContainer(getExistingDataContainerName());
+    }
+    if(getErrorCondition() < 0)
+    {
+      return;
+    }
+  }
+  else
+  {
+    //new data container
+    m = getDataContainerArray()->getDataContainer(getNewDataContainerName());
+    if(getErrorCondition() < 0)
+    {
+      return;
+    }
+  }
+
+  //set dimensions of data container if creating new
+  if(!getAddToExistingDataContainer())
+  {
+    DataContainer::Pointer m = getDataContainerArray()->getDataContainer(getNewDataContainerName());
+    ImageGeom::Pointer image = ImageGeom::CreateGeometry("BinaryImage");
+    image->setOrigin(m_Origin.x, m_Origin.y, m_Origin.z);
+    image->setResolution(m_Resolution.x, m_Resolution.y, m_Resolution.z);
+    image->setDimensions(m_Dimensions.x, m_Dimensions.y, m_Dimensions.z);
+    m->setGeometry(image);
+  }
 
   setErrorCondition(0);
 
   // Get the total size of the array from the options
-  size_t voxels = m_Dimensions.x * m_Dimensions.y * m_Dimensions.z;
-  if (m_OverRideOriginResolution == true)
+  size_t voxels;
+  QVector<size_t> tDims;
+  QString attributeMatrixName;
+  switch(getAttributeMatrixType())
   {
-    image->setOrigin(m_Origin.x, m_Origin.y, m_Origin.z);
-    image->setResolution(m_Resolution.x, m_Resolution.y, m_Resolution.z);
-  }
-  image->setDimensions(m_Dimensions.x, m_Dimensions.y, m_Dimensions.z);
+    //cell
+    case 0:
+      {
+        voxels = m_Dimensions.x * m_Dimensions.y * m_Dimensions.z;
+        tDims = QVector<size_t>(3, 0);
+        tDims[0] = m_Dimensions.x;
+        tDims[1] = m_Dimensions.y;
+        tDims[2] = m_Dimensions.z;
+        attributeMatrixName = getCellAttributeMatrixName();
+      }
+      break;
 
-  if(getAddToExistingAttributeMatrix() == false)
+    //cell feature
+    case 1:
+      {
+        voxels = getNumFeatures();
+        tDims = QVector<size_t>(1, voxels);
+        attributeMatrixName = getCellFeatureAttributeMatrixName();
+      }
+      break;
+
+
+    //cell ensemble
+    case 2:
+      {
+        voxels = getNumPhases();
+        tDims = QVector<size_t>(1, voxels);
+        attributeMatrixName = getCellEnsembleAttributeMatrixName();
+      }
+      break;
+
+    default:
+      //future location for other types
+      QString ss = QObject::tr("Unsupported AttributeMatrix type selected.");
+      setErrorCondition(-1);
+      notifyErrorMessage(getHumanLabel(), ss, getErrorCondition());
+      return;
+  }
+
+  //resize attribute matrix if creating new
+  if(!getAddToExistingAttributeMatrix())
   {
-    QVector<size_t> tDims(3, 0);
-    tDims[0] = m_Dimensions.x;
-    tDims[1] = m_Dimensions.y;
-    tDims[2] =  m_Dimensions.z;
-    m->getAttributeMatrix(getCellAttributeMatrixName())->resizeAttributeArrays(tDims);
+    m->getAttributeMatrix(attributeMatrixName)->resizeAttributeArrays(tDims);
   }
 
   array = IDataArray::NullPointer();
@@ -639,7 +928,7 @@ void RawBinaryReader::execute()
 
   if (NULL != array.get())
   {
-    m->getAttributeMatrix(getCellAttributeMatrixName())->addAttributeArray(array->getName(), array);
+    m->getAttributeMatrix(attributeMatrixName)->addAttributeArray(array->getName(), array);
   }
   else if(err == RBR_FILE_NOT_OPEN )
   {
@@ -670,19 +959,6 @@ void RawBinaryReader::execute()
 // -----------------------------------------------------------------------------
 AbstractFilter::Pointer RawBinaryReader::newFilterInstance(bool copyFilterParameters)
 {
-  /*
-  * ScalarType
-  * Endian
-  * Dimensionality
-  * NumberOfComponents
-  * Dimensions
-  * Origin
-  * Resolution
-  * OverRideOriginResolution
-  * SkipHeaderBytes
-  * OutputArrayName
-  * InputFile
-  */
   RawBinaryReader::Pointer filter = RawBinaryReader::New();
   if(true == copyFilterParameters)
   {

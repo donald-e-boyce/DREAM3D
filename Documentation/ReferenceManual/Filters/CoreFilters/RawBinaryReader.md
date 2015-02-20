@@ -10,18 +10,11 @@ IO Filters
 This filter is designed to read data stored in files on the users system that are stored in their
 binary form versus ascii form. The data file should **NOT** have any type of header before the data in the file. The user should know exactly how the data is stored in the file and properly define this in the user interface. Not correctly identifying the type of data can cause serious issues because on a low level this filter is simply reading the data into a preallocated array and interpreted as the user defines. This filter can be used as a sort of bridge to read in binary data from sources like IDL and MatLab. 
 
-The data is assumed to be on a rectilinear grid and will be stored in the Volume DataContainer. In a rectilinear grid the spacing on each axis is constant but each axis can have a different value. The spacing is also sometimes referred to as the _Resolution_ of the axis..
+If **Cell** is selected for *Attribute Matrix Type* the data is assumed to be on a rectilinear grid. If **Cell Feature** or **Cell Ensemble** is selected the data is assumed to be a contiguous vector (starting with feature or phase 0 respectively). The data can be stored in an existing data container (in an existing or new attribute matrix) or new volume data container (and new attribute matrix). If a new data container is created dimensions, origin, and resolution must be specified. If a new **Cell Feature** or **Cell Ensemble** attribute matrix is created its size must be specified (a **Cell** attribute matrix is assumed to have the same dimensions as the Volume data container selected or created).
 
 This filter will error out and block the pipeline from running if the total number of bytes that would need to be read from the file is larger than the actual file itself. The pipeline will not run at this point.
 
 The user can use an input file that is actually **Larger** than the number of bytes required by the filter and the filter will only read the first part of the file unless an amount of bytes to skip is set. See more input parameters farther down the documentation.
-
----
-
-![User Interface for Raw Binary Reader](RawBinaryReader-GUI.png)
-@image latex RawBinaryReader-GUI.png " " width=5in
-
----
 
 ### Scalar Type ###
 
@@ -31,10 +24,6 @@ Computer data comes in 10 basic types on modern 32bit and 64 bit operating syste
 @image latex RawBinaryReader-Types.png " " width=2in
 
 ---
-
-### Dimensionality ###
-
- This tells the program how many dimensions are used to store the data: 1, 2 or 3 are the only valid values.
 
 ### Number of Components ###
 
@@ -55,7 +44,7 @@ So the user can see how it is very important to set this value properly
 
 ### Dimensions ###
 
-This tells the program the number of elements in each of the 3 major dimension axis. For example a 2D Image that is 512 pixels wide by 384 pixels high would have values of:
+This tells the program the number of elements in each of the 3 major dimension axis for a created VolumeDataContainer (and it's Cell Attribute Matrix). For example a 2D Image that is 512 pixels wide by 384 pixels high would have values of:
 
 | X | Y | Z |
 |---|---|---|
@@ -70,16 +59,12 @@ while a 3D Data set of 128 x 256 x 64 (X, Y, Z) would have the following:
 
 ### Origin ###
 
-This tells the program where in space the (0,0,0) element is located. The default is (0.0, 0.0, 0.0).
+This tells the program where in space the (0,0,0) element is located for a created VolumeDataContainer. The default is (0.0, 0.0, 0.0).
 
 
 ### Resolution ###
 
-This tells the program the Resolution along each axis of the rectilinear grid.
-
-### Over Ride Origin & Resolution ###
-
-If this checkbox is checked (defaulted to ON) then the origin and resolution values from this filter will be applied to the Voxel Data Container. If the checkbox is left _unchecked_ then the origin and resolution values will NOT be applied to the Voxel Data Container
+This tells the program the Resolution along each axis of the rectilinear grid for a VolumeDataContainer.
 
 ### Skip Header Bytes ###
 
@@ -89,12 +74,20 @@ If the raw binary file you are reading has a _header_ before the actual data beg
 ### Output Array Name ###
 This is the name of the array that the data should be stored as in the Voxel Data Container. Certain filters depend on specific names for the arrays that they require. If you are importing data in order to run a filter on the data then consulting the documentation for the specific filter should indicate an appropriate name to use for the created array.
 
------
+### Add to Existing DataContainer ###
+If false a new data container with the specified Dimensions, Origin, and Resolution will be created. Otherwise the data will be read into an existing data container (and the original containers Dimensions, Origin, and Resolution preserved).
 
-## IMPORTANT NOTES ##
-Using this filter in combination with an existing pipeline that would already have data will OVER WRITE the Origin, Spacing and Resolution that is stored for the in memory voxel data. For instance reading a .dream3d data file with an origin of (0,0,0) and then using this filter to import more data but setting the origin in the filter to (10,5,12) will set the **Entire** voxel volume to have the new origin value.
+### Add to Existing Attribute Matrix ###
+If false a new attribute matrix of the specified type will be created. Otherwise the data will be read into a specified attribute matrix.
 
------
+### Data Container ###
+The data container in which to create a new attribute matrix in the case of *Add to Existing DataContainer* == true and *Add to Existing AttributeMatrix* == false.
+
+### Attribute Matrix Type ###
+The type of attribute matrix to create in the case of *Add to Existing DataContainer* == true and *Add to Existing AttributeMatrix* == false.
+
+### Attribute Matrix ###
+The attribute matrix in which to create a new data array in the case of *Add to Existing DataContainer* == true and *Add to Existing AttributeMatrix* == true.
 
 ## Parameters ##
 
@@ -102,7 +95,7 @@ See above
 
 ## Required DataContainers ##
 
-Voxel DataContainer
+None
 
 ## Required Arrays ##
 
@@ -114,7 +107,7 @@ Single Array based on the parameters of the filter
 
 ## Authors ##
 
-**Copyright:** 2012 Michael A. Groeber (AFRL),2012 Michael A. Jackson (BlueQuartz Software)
+**Copyright:** 2012 Michael A. Groeber (AFRL),2012 Michael A. Jackson (BlueQuartz Software), 2015 Will Lenthe (UCSB)
 
 **Contact Info:** dream3d@bluequartz.net
 
