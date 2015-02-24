@@ -7,28 +7,25 @@ Generic Filters (Misc)
 ## Description ##
 This filter generates a color for each **Element** based on the vector assigned to that **Element** in the input vector data array.  The color scheme assigns a unique color to all points on the unit hemisphere using a HSV-like scheme. 
 
-## Input Options ##
-| Option | Type |
-|-------|-------|
-| Vectors Array Path | DataArrayPath |
-| GoodVoxles Array Path | DataArrayPath |
-| CellVectorColorsArrayName | QString |
-| UseGoodVoxels | bool |
+## Parameters ##
+| Name             | Type | Description |
+|------------------|------|---------|
+| UseGoodVoxels | Boolean | Whether or not to assign colors to "bad" voxels or leave them black |
 
 ## Required Geometry ##
 Not Applicable
 
 ## Required Arrays ##
-
-| Type | Default Name | Description  | Filters Known to Create Data |
-|------|--------------|------------|-----|
-| Element | VectorData | The array that holds the vectors the colors will represent  |
+| Type | Default Name | Type | Component Dimensions (dimension, size) | Description |
+|------|--------------|-------------|---------|-----|
+| Element | VectorData | Float | (1,3) | Vectors the colors will represent  |
+| Element | GoodVoxels | Boolean | (1,1) | States if the **Element** is a 'good' **Element**  |
 
 
 ## Created Arrays ##
-| Type | Name | Description |
-|------|------|-------------|
-| Element | Colors | The RGB colors are encoded as an unsigned char triplet  |
+| Type | Default Name | Type | Component Dimensions (dimension, size) | Description |
+|------|--------------|-------------|---------|-----|
+| Element | Colors | Unsigned Char | (1,3) | The RGB colors |
 
 
 ### Authors ###
